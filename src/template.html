@@ -195,6 +195,13 @@
                         </svg>
                     </button>
 
+                    <button id="readJson" class="controlButton" title="Read camera_path.json">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
+                            <g class='stroke'><use href="#videoIcon"/></g>
+                            <g class='fill'><use href="#videoIcon"/></g>
+                        </svg>
+                    </button>
+
                     <button id="labels" class="controlButton" title="Add Labels">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
                             <g class='stroke'><use href="#labelIcon"/></g>
@@ -435,6 +442,22 @@
             <symbol id="orthoIcon" viewBox="0 0 24 24">
                 <path fill-rule="evenodd" clip-rule="evenodd" d="M5 2C3.34315 2 2 3.34315 2 5V19C2 20.6569 3.34315 22 5 22H19C20.6569 22 22 20.6569 22 19V5C22 3.34315 20.6569 2 19 2H5ZM5 7V17H17V7H5Z"/>
             </symbol>
+            <symbol id="videoIcon" viewBox="0 0 30.000407 30.000403">
+                <g transform="translate(-4.999796,35.000199) scale(0.100000,-0.100000)">
+                    <path d="M67 332 c-14 -15 -17 -41 -17 -134 0 -150 -2 -148 152 -148 150 0
+148 -2 148 152 0 150 2 148 -152 148 -99 0 -117 -3 -131 -18z m49 -23 c10 -17
+-13 -36 -27 -22 -12 12 -4 33 11 33 5 0 12 -5 16 -11z m134 -39 l0 -50 -50 0
+-50 0 0 50 0 50 50 0 50 0 0 -50z m66 39 c10 -17 -13 -36 -27 -22 -12 12 -4
+33 11 33 5 0 12 -5 16 -11z m-196 -74 c0 -8 -9 -15 -20 -15 -11 0 -20 7 -20
+15 0 8 9 15 20 15 11 0 20 -7 20 -15z m200 0 c0 -8 -9 -15 -20 -15 -11 0 -20
+7 -20 15 0 8 9 15 20 15 11 0 20 -7 20 -15z m-200 -70 c0 -8 -9 -15 -20 -15
+-11 0 -20 7 -20 15 0 8 9 15 20 15 11 0 20 -7 20 -15z m130 -35 l0 -50 -50 0
+-50 0 0 50 0 50 50 0 50 0 0 -50z m70 35 c0 -8 -9 -15 -20 -15 -11 0 -20 7
+-20 15 0 8 9 15 20 15 11 0 20 -7 20 -15z m-204 -56 c10 -17 -13 -36 -27 -22
+-12 12 -4 33 11 33 5 0 12 -5 16 -11z m200 0 c10 -17 -13 -36 -27 -22 -12 12
+-4 33 11 33 5 0 12 -5 16 -11z"/>
+                </g>
+            </symbol>
             <symbol id="labelIcon" viewBox="0 0 24 24">
                 <path fill-rule="evenodd" clip-rule="evenodd" d="M2 5C2 3.3431 3.3431 2 5 2H9.1716C9.7064 2 10.2225 2.2121 10.6064 2.5858L21.4142 13.3936C22.1953 14.1747 22.1953 15.4359 21.4142 16.217L16.2172 21.4142C15.4361 22.1953 14.1749 22.1953 13.3938 21.4142L2.5858 10.6064C2.2121 10.2225 2 9.7064 2 9.1716V5ZM7.5 3.5A1.5 1.5 0 1 1 7.5 6.5A1.5 1.5 0 0 1 7.5 3.5Z"/>
             </symbol>
@@ -576,14 +599,17 @@
 
                 const viewer = await main(appElement.app, cameraElement.entity, settingsJson, config);
                 window.__lfsViewer = viewer;
-                // Vendored gizmo/measure/label tool code (see gizmo.js,
-                // measure-tool.js, label-tool.js) is appended after this bundle
-                // at build time and exposes itself via these hooks so it can
-                // share the viewer's app/camera/events. The label tool also
-                // receives the viewer so it can clear labels when the model
-                // is closed or swapped.
+                // Vendored gizmo/measure/label/read-json tool code (see
+                // gizmo.js, measure-tool.js, label-tool.js, read-json-tool.js)
+                // is appended after this bundle at build time and exposes
+                // itself via these hooks so it can share the viewer's
+                // app/camera/events. The label and read-json tools also
+                // receive the viewer: label-tool clears labels when the
+                // model is closed or swapped, read-json-tool reaches
+                // viewer.cameraManager.loadAnimTrack().
                 window.__lfsInitMeasureTool?.(viewer.global);
                 window.__lfsInitLabelTool?.(viewer.global, viewer);
+                window.__lfsInitReadJsonTool?.(viewer.global, viewer);
 
                 initModelControls(viewer);
             });
