@@ -1,0 +1,11 @@
+node_modules/
+
+# local debug leftovers
+.check.mjs
+.verify.mjs
+.repro.mjs
+.repro-ui.mjs
+.repro-out.txt
+.hl-dom.html
+.hl2-dom.html
+.hl2-err.log
