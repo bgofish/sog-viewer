@@ -125,6 +125,41 @@ js = replaceOnce(js,
 };`,
     'openModel/closeModel');
 
+js = replaceOnce(js,
+    `            // update animation timeline
+            if (state.cameraMode === 'anim') {
+                state.animationTime = controllers.anim.animState.cursor.value;
+            }
+        };
+        // handle input events`,
+    `            // update animation timeline
+            if (state.cameraMode === 'anim') {
+                state.animationTime = controllers.anim.animState.cursor.value;
+            }
+        };
+        // Swap in a freshly-built anim track (e.g. from the read-json-tool)
+        // as the live 'anim' controller. Reuses the same cameraMode/
+        // transition machinery as the built-in animTracks path instead of
+        // duplicating it: assigning state.cameraMode fires the
+        // 'cameraMode:changed' handler below, which calls onEnter() on
+        // whatever controllers.anim currently points at and resets the
+        // transition timer.
+        this.loadAnimTrack = (track) => {
+            controllers.anim = new AnimController(track);
+            state.hasAnimation = true;
+            state.animationDuration = controllers.anim.animState.cursor.duration;
+            state.animationPaused = false;
+            if (state.cameraMode === 'anim') {
+                // the state proxy only fires 'cameraMode:changed' on an
+                // actual value change, so hop through 'orbit' first to force
+                // re-entry into the new controller.
+                state.cameraMode = 'orbit';
+            }
+            state.cameraMode = 'anim';
+        };
+        // handle input events`,
+    'CameraManager.loadAnimTrack');
+
 const bundle = js
     + '\n(function () {\n'
     + stripTrailingExport(read('gizmo.js'), 'export { Gizmo, TranslateGizmo };', 'gizmo.js')
@@ -132,8 +167,11 @@ const bundle = js
     + stripTrailingExport(read('measure-tool.js'), 'export { initMeasureTool };', 'measure-tool.js')
     + '\n'
     + stripTrailingExport(read('label-tool.js'), 'export { initLabelTool };', 'label-tool.js')
+    + '\n'
+    + stripTrailingExport(read('read-json-tool.js'), 'export { initReadJsonTool };', 'read-json-tool.js')
     + '\nwindow.__lfsInitMeasureTool = initMeasureTool;\n'
-    + 'window.__lfsInitLabelTool = initLabelTool;\n})();\n';
+    + 'window.__lfsInitLabelTool = initLabelTool;\n'
+    + 'window.__lfsInitReadJsonTool = initReadJsonTool;\n})();\n';
 
 let html = read('template.html');
 
