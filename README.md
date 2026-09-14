@@ -1,3 +1,4 @@
+<img width="1919" height="908" alt="Screenshot 2026-09-13 182902" src="https://github.com/user-attachments/assets/f369f183-ef9f-4e61-8e1d-868702066e6b" />
 # SOG Viewer
 
 A single-file browser viewer for 3D Gaussian splat models: SOG (the format
