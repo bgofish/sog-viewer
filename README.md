@@ -13,6 +13,17 @@ button, view it, close it, and pick another one whenever you want.
 3. Navigate: left mouse orbit, right mouse pan, wheel zoom, double-click to set focus, `F` frame scene, `R` reset camera. Orbit/fly toggle, measure, ortho mode, FOV settings and fullscreen all work as in the LichtFeld Studio export.
 4. Click the **X** button to close the model, then open another file.
 
+## Features
+- **Labels**: click the tag icon to drop named annotation points on the
+  model (click to place/select, double-click to rename, right-click to
+  delete). Labels behind the camera are automatically hidden and are not
+  clickable. Save/load a label set as `<model>.labels.json`.
+- **Read camera_path.json**: click the film-strip icon to load a
+  LichtFeld Studio `camera_path.json` and play it back as a camera
+  animation. Contributed by [bgofish](https://github.com/bgofish/sog-viewer).
+- Measure distance, orthographic mode, and FOV/fullscreen controls, as in
+  the LichtFeld Studio export.
+
 ## Building
 
 ```sh
