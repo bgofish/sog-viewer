@@ -152,6 +152,12 @@
                             <g class='fill'><use href="#closeIcon"/></g>
                         </svg>
                     </button>
+                    <button id="exportHtml" class="controlButton hidden" title="Export as self-contained HTML">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
+                            <g class='stroke'><use href="#labelSaveIcon"/></g>
+                            <g class='fill'><use href="#labelSaveIcon"/></g>
+                        </svg>
+                    </button>
 
                     <button id="play" class="controlButton hidden">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
@@ -215,6 +221,25 @@
                         </svg>
                     </button>
                     <button id="labelLoad" class="controlButton" title="Load Labels (.labels.json)">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
+                            <g class='stroke'><use href="#labelLoadIcon"/></g>
+                            <g class='fill'><use href="#labelLoadIcon"/></g>
+                        </svg>
+                    </button>
+
+                    <button id="annotate" class="controlButton" title="Add Annotation">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
+                            <g class='stroke'><use href="#annotateIcon"/></g>
+                            <g class='fill'><use href="#annotateIcon"/></g>
+                        </svg>
+                    </button>
+                    <button id="annotationSave" class="controlButton" title="Export Annotations (.json)">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
+                            <g class='stroke'><use href="#labelSaveIcon"/></g>
+                            <g class='fill'><use href="#labelSaveIcon"/></g>
+                        </svg>
+                    </button>
+                    <button id="annotationLoad" class="controlButton" title="Import Annotations (.json)">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
                             <g class='stroke'><use href="#labelLoadIcon"/></g>
                             <g class='fill'><use href="#labelLoadIcon"/></g>
@@ -458,6 +483,9 @@
 -4 33 11 33 5 0 12 -5 16 -11z"/>
                 </g>
             </symbol>
+            <symbol id="annotateIcon" viewBox="0 0 24 24">
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C8.1 2 5 5.16 5 9.05C5 14.3 12 22 12 22C12 22 19 14.3 19 9.05C19 5.16 15.9 2 12 2ZM12 11.7C10.51 11.7 9.3 10.5 9.3 9C9.3 7.5 10.51 6.3 12 6.3C13.49 6.3 14.7 7.5 14.7 9C14.7 10.5 13.49 11.7 12 11.7Z"/>
+            </symbol>
             <symbol id="labelIcon" viewBox="0 0 24 24">
                 <path fill-rule="evenodd" clip-rule="evenodd" d="M2 5C2 3.3431 3.3431 2 5 2H9.1716C9.7064 2 10.2225 2.2121 10.6064 2.5858L21.4142 13.3936C22.1953 14.1747 22.1953 15.4359 21.4142 16.217L16.2172 21.4142C15.4361 22.1953 14.1749 22.1953 13.3938 21.4142L2.5858 10.6064C2.2121 10.2225 2 9.7064 2 9.1716V5ZM7.5 3.5A1.5 1.5 0 1 1 7.5 6.5A1.5 1.5 0 0 1 7.5 3.5Z"/>
             </symbol>
@@ -506,6 +534,7 @@
             const initModelControls = (viewer) => {
                 const openButton = document.getElementById('openModel');
                 const closeButton = document.getElementById('closeModel');
+                const exportButton = document.getElementById('exportHtml');
                 const emptyOpen = document.getElementById('emptyOpen');
                 const fileInput = document.getElementById('sogFileInput');
                 const emptyWrap = document.getElementById('emptyWrap');
@@ -531,11 +560,13 @@
                     fileName.textContent = name;
                     fileName.classList.remove('hidden');
                     closeButton.classList.remove('hidden');
+                    exportButton.classList.remove('hidden');
                 };
                 const hideModel = () => {
                     fileName.textContent = '';
                     fileName.classList.add('hidden');
                     closeButton.classList.add('hidden');
+                    exportButton.classList.add('hidden');
                 };
                 const revokeUrl = () => {
                     if (blobUrl) {
@@ -547,6 +578,7 @@
                 const closeCurrent = () => {
                     if (viewer.currentModel) {
                         viewer.closeModel();
+                        viewer.currentModelFile = null;
                         revokeUrl();
                         hideModel();
                     }
@@ -565,6 +597,7 @@
                     try {
                         blobUrl = URL.createObjectURL(file);
                         await viewer.openModel(blobUrl, file.name);
+                        viewer.currentModelFile = file;
                         hideLoading();
                         showModel(file.name);
                     }
@@ -588,6 +621,47 @@
                     closeCurrent();
                     showEmpty();
                 });
+
+                // A self-contained export (see export-tool.js) embeds its
+                // model and loads it via main()'s own initial gsplatLoad,
+                // not through openFile() above - so nothing else tells this
+                // UI a model is already loading/loaded. main() isn't async
+                // and returns immediately, long before that background load
+                // actually finishes, so checking viewer.currentModel here
+                // (synchronously, right at startup) is almost always too
+                // early - hook onModelReady itself instead, which is what
+                // actually fires (once, from either load path) when a model
+                // becomes available.
+                const syncLoadedUi = () => {
+                    hideEmpty();
+                    const dataTag = document.getElementById('lfsModelData');
+                    showModel((dataTag && dataTag.dataset.filename) || 'Embedded model');
+                    // showModel() also reveals Export, but that needs a real
+                    // File object (for .arrayBuffer()) that this load path -
+                    // main()'s own initial gsplatLoad, not openFile() - never
+                    // has. Re-hide it rather than show a button that can
+                    // only ever alert when clicked.
+                    exportButton.classList.add('hidden');
+                };
+                if (viewer.currentModel) {
+                    // Covers the (unlikely but cheap to handle) case where
+                    // it somehow already finished by the time we get here.
+                    syncLoadedUi();
+                }
+                else {
+                    const originalOnModelReady = viewer.onModelReady;
+                    viewer.onModelReady = (gsplatEntity) => {
+                        // Restore immediately so this only ever fires once -
+                        // any later interactive opens via the Open button go
+                        // through openFile()'s own explicit UI updates only,
+                        // with nothing redundant happening here.
+                        viewer.onModelReady = originalOnModelReady;
+                        originalOnModelReady.call(viewer, gsplatEntity);
+                        if (gsplatEntity) {
+                            syncLoadedUi();
+                        }
+                    };
+                }
             };
 
             document.addEventListener('DOMContentLoaded', async () => {
@@ -599,17 +673,26 @@
 
                 const viewer = await main(appElement.app, cameraElement.entity, settingsJson, config);
                 window.__lfsViewer = viewer;
-                // Vendored gizmo/measure/label/read-json tool code (see
-                // gizmo.js, measure-tool.js, label-tool.js, read-json-tool.js)
-                // is appended after this bundle at build time and exposes
+                // Vendored gizmo/measure/label/read-json/annotation/export
+                // tool code (see gizmo.js, measure-tool.js, label-tool.js,
+                // read-json-tool.js, annotation-tool.js, export-tool.js) is
+                // appended after this bundle at build time and exposes
                 // itself via these hooks so it can share the viewer's
-                // app/camera/events. The label and read-json tools also
-                // receive the viewer: label-tool clears labels when the
-                // model is closed or swapped, read-json-tool reaches
-                // viewer.cameraManager.loadAnimTrack().
+                // app/camera/events. The label, read-json, annotation and
+                // export tools also receive the viewer: label-tool clears
+                // labels when the model is closed or swapped,
+                // read-json-tool reaches viewer.cameraManager.loadAnimTrack(),
+                // annotation-tool reaches viewer.cameraManager.camera for
+                // the current view (and clears annotations on model swap
+                // like label-tool does), export-tool reads all of the above
+                // back out (viewer.currentModelFile,
+                // viewer.cameraManager.camera/currentAnimTrack,
+                // viewer.__lfsAnnotations) to build a standalone export.
                 window.__lfsInitMeasureTool?.(viewer.global);
                 window.__lfsInitLabelTool?.(viewer.global, viewer);
                 window.__lfsInitReadJsonTool?.(viewer.global, viewer);
+                window.__lfsInitAnnotationTool?.(viewer.global, viewer);
+                window.__lfsInitExportTool?.(viewer.global, viewer);
 
                 initModelControls(viewer);
             });

@@ -290,11 +290,13 @@ function initMeasureTool(global) {
     button?.addEventListener('click', () => {
         const next = !active;
         if (next) {
-            // Only one pick tool should be live at a time: both attach a
-            // left-button gizmo, so turn the label tool off if it is on.
-            const labelButton = document.getElementById('labels');
-            if (labelButton && labelButton.classList.contains('active')) {
-                labelButton.click();
+            // Only one pick tool should be live at a time: all three attach
+            // a left-button gizmo or consume clicks, so turn the others off.
+            for (const id of ['labels', 'annotate']) {
+                const other = document.getElementById(id);
+                if (other && other.classList.contains('active')) {
+                    other.click();
+                }
             }
         }
         setActive(next);

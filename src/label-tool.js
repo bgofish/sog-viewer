@@ -29,6 +29,10 @@
  * swap models at runtime), labels are cleared on every model change and
  * the loaded file name is used as the suggested .labels.json file name. Ignored
  * for the studio export, whose model is fixed at export time.
+ *
+ * A self-contained export (see export-tool.js) folds the live label set
+ * into settings.labels; if present at startup, those are loaded the same
+ * way an imported .lbl file's labels are (see validateLabels/parseLabels).
  */
 
 // Screen-space offset (px) of the text anchor from the label point; the
@@ -59,6 +63,15 @@ function initLabelTool(global, viewer) {
     let gizmoLayer = null;
     let pivot = null;
     let picker = null;
+
+    // Exposed so export-tool.js can fold the live label set into a
+    // self-contained export without this file needing to know anything
+    // about exporting. Stable array reference (replaceLabels clears/refills
+    // it in place rather than reassigning), so a plain assignment here is
+    // enough to always see current content later.
+    if (viewer) {
+        viewer.__lfsLabels = labels;
+    }
 
     const _screen = new Vec3();
     const _view = new Vec3();
@@ -303,9 +316,7 @@ function initLabelTool(global, viewer) {
         setTimeout(() => URL.revokeObjectURL(url), 1000);
     };
 
-    const parseLabels = (raw) => {
-        const parsed = JSON.parse(raw);
-        const arr = Array.isArray(parsed) ? parsed : (parsed && parsed.labels);
+    const validateLabels = (arr) => {
         if (!Array.isArray(arr)) {
             throw new Error('no labels array found');
         }
@@ -320,6 +331,12 @@ function initLabelTool(global, viewer) {
                 position: new Vec3(Number(pos[0]), Number(pos[1]), Number(pos[2]))
             };
         });
+    };
+
+    const parseLabels = (raw) => {
+        const parsed = JSON.parse(raw);
+        const arr = Array.isArray(parsed) ? parsed : (parsed && parsed.labels);
+        return validateLabels(arr);
     };
 
     const fileInput = document.createElement('input');
@@ -346,6 +363,24 @@ function initLabelTool(global, viewer) {
         replaceLabels(next);
     });
     document.getElementById('ui').appendChild(fileInput);
+
+    // A self-contained export (see export-tool.js) folds the live label set
+    // into settings.labels. Load it now if present - labels are a pure
+    // SVG/DOM overlay (not scene entities), so unlike annotations there's
+    // no need to wait for the model to finish loading first.
+    if (Array.isArray(global.settings.labels) && global.settings.labels.length > 0) {
+        console.info('[LabelTool] found', global.settings.labels.length, 'embedded label(s) in settings, loading...');
+        try {
+            replaceLabels(validateLabels(global.settings.labels));
+            console.info('[LabelTool] loaded', labels.length, 'label(s) OK');
+        }
+        catch (err) {
+            console.error('[LabelTool] failed to load embedded labels:', err);
+        }
+    }
+    else {
+        console.info('[LabelTool] settings.labels:', global.settings.labels);
+    }
 
     // ---- point picking on click (drag = camera navigation, not a pick) ---
     const isPrimary = (e) => (e.pointerType === 'mouse' ? e.button === 0 : e.isPrimary);
@@ -536,11 +571,13 @@ function initLabelTool(global, viewer) {
     modeButton?.addEventListener('click', () => {
         const next = !active;
         if (next) {
-            // Only one pick tool should be live at a time: both attach a
-            // left-button gizmo, so turn the measure tool off if it is on.
-            const measureButton = document.getElementById('measure');
-            if (measureButton && measureButton.classList.contains('active')) {
-                measureButton.click();
+            // Only one pick tool should be live at a time: all three attach
+            // a left-button gizmo or consume clicks, so turn the others off.
+            for (const id of ['measure', 'annotate']) {
+                const other = document.getElementById(id);
+                if (other && other.classList.contains('active')) {
+                    other.click();
+                }
             }
         }
         setActive(next);
