@@ -636,12 +636,11 @@
                     hideEmpty();
                     const dataTag = document.getElementById('lfsModelData');
                     showModel((dataTag && dataTag.dataset.filename) || 'Embedded model');
-                    // showModel() also reveals Export, but that needs a real
-                    // File object (for .arrayBuffer()) that this load path -
-                    // main()'s own initial gsplatLoad, not openFile() - never
-                    // has. Re-hide it rather than show a button that can
-                    // only ever alert when clicked.
-                    exportButton.classList.add('hidden');
+                    // Export works here too: export-tool.js falls back to
+                    // decoding the already-embedded #lfsModelData when
+                    // there's no File object (this load path - main()'s own
+                    // initial gsplatLoad, not openFile() - never has one),
+                    // so the button stays usable rather than getting hidden.
                 };
                 if (viewer.currentModel) {
                     // Covers the (unlikely but cheap to handle) case where

@@ -57,22 +57,24 @@
  * Caveats worth knowing (this file can't be exercised in a real browser
  * from here, so these are reasoned through and simulated against the real
  * built output rather than exercised end-to-end in an actual browser):
- *   - Base64 adds ~33% size, twice over now (once for the pristine-HTML
- *     copy build.mjs embeds, once for the model here), and the chunked
- *     encoder below builds one big intermediate string - fine for typical
- *     compressed .sog/.ply sizes, but a very large model may be slow/
- *     memory-heavy to embed this way.
+ *   - Base64 adds ~33% size, three times over now (the pristine-HTML copy
+ *     build.mjs embeds, the model, and - since every export also carries
+ *     its own pristine-HTML copy forward so it can itself be re-exported -
+ *     that copy again), and the chunked encoder below builds one big
+ *     intermediate string - fine for typical compressed .sog/.ply sizes,
+ *     but a very large model may be slow/memory-heavy to embed this way.
  *   - Only single-file models are supported (whatever the Open button's
  *     <input type=file> accepted). A multi-chunk SOG (meta.json + several
  *     side files) isn't something the local-open flow handles either, so
  *     this isn't a new limitation, but it IS a real one.
- *   - Only works for a model opened via the Open button (needs the raw
- *     File object). A model loaded via a ?content= URL has no local bytes
- *     to embed, so export is disabled in that case. Re-exporting from an
- *     already-exported file is also not currently supported (it has no
- *     File object either, and no embedded pristine-HTML copy of itself to
- *     build a new export from) - fails with a clear alert rather than a
- *     broken file, but is a real gap if you need it.
+ *   - Works for a model opened via the Open button (the real File object),
+ *     or for re-exporting an already self-contained export (getModelSource()
+ *     falls back to decoding the model bytes already sitting in
+ *     #lfsModelData). A model loaded via a ?content= URL has neither, so
+ *     export is disabled in that case. Re-exporting an export made *before*
+ *     this fix still won't work - it never carried a pristine-HTML copy of
+ *     itself forward - and fails with a clear alert rather than a broken
+ *     file.
  *
  * IMPORTANT: like the other vendored tool files, this is NOT self-contained
  * at runtime - see gizmo.js's header comment for the concatenation/closure
@@ -234,17 +236,45 @@ function initExportTool(global, viewer) {
         return text.slice(0, i) + replace + text.slice(i + search.length);
     };
 
+    // ---- where to get the model's raw bytes from -------------------------
+    // Either a real File from the Open button (viewer.currentModelFile), or -
+    // if this page is itself an already-exported file - the model bytes
+    // already sitting in #lfsModelData, decoded back out. Same atob/
+    // Uint8Array decode used by the bootstrap's own content-loading IIFE.
+    const getModelSource = () => {
+        if (viewer.currentModelFile) {
+            const file = viewer.currentModelFile;
+            return { name: file.name, arrayBuffer: () => file.arrayBuffer() };
+        }
+        const el = document.getElementById('lfsModelData');
+        if (el && el.textContent) {
+            const name = (el.dataset && el.dataset.filename) || 'model';
+            return {
+                name,
+                arrayBuffer: async () => {
+                    const bin = atob(el.textContent);
+                    const bytes = new Uint8Array(bin.length);
+                    for (let i = 0; i < bin.length; i++) {
+                        bytes[i] = bin.charCodeAt(i);
+                    }
+                    return bytes.buffer;
+                }
+            };
+        }
+        return null;
+    };
+
     const exportHtml = async () => {
-        const file = viewer.currentModelFile;
-        if (!viewer.currentModel || !file) {
-            window.alert('Export needs a model opened via the Open button (the raw file bytes are what get embedded).');
+        const source = getModelSource();
+        if (!viewer.currentModel || !source) {
+            window.alert('Export needs a model opened via the Open button, or an already self-contained export to re-export (the raw model bytes are what get embedded).');
             return;
         }
 
         button.disabled = true;
         try {
             const baseHtml = getBaseHtml();
-            const buffer = await file.arrayBuffer();
+            const buffer = await source.arrayBuffer();
             const modelBase64 = bufferToBase64(buffer);
             const settings = buildSettings();
             // Annotation/label titles and text are user-typed and land raw
@@ -263,7 +293,15 @@ function initExportTool(global, viewer) {
                 '- from viewer.__lfsAnnotations:', (viewer.__lfsAnnotations || []).length,
                 'viewer.__lfsLabels:', (viewer.__lfsLabels || []).length);
 
-            const dataScriptTag = `<script type="text/plain" id="lfsModelData" data-filename="${(file.name || 'model').replace(/"/g, '&quot;')}">${modelBase64}<\/script>\n</body>`;
+            const dataScriptTag = `<script type="text/plain" id="lfsModelData" data-filename="${(source.name || 'model').replace(/"/g, '&quot;')}">${modelBase64}<\/script>\n</body>`;
+            // Carry the pristine template forward into this new export too -
+            // otherwise only the very first export (made from the real app)
+            // would ever be re-exportable; every export after that would
+            // have no base of its own to splice a future export from. This
+            // is exactly baseHtml re-encoded, so re-exporting from this new
+            // file finds the identical pristine template all over again.
+            const pristineBase64 = bufferToBase64(new TextEncoder().encode(baseHtml).buffer);
+            const pristineScriptTag = `<script type="text/plain" id="lfsPristineHtml">${pristineBase64}<\/script>`;
             const contentReplacement = `                ...(() => {
                     const el = document.getElementById('lfsModelData');
                     if (!el) {
@@ -296,7 +334,7 @@ function initExportTool(global, viewer) {
             if (next === null) {
                 throw new Error('could not find the settings anchor in this page\'s own source');
             }
-            out = next.replace(/<\/body>\s*<\/html>\s*$/, dataScriptTag + '\n</html>');
+            out = next.replace(/<\/body>\s*<\/html>\s*$/, dataScriptTag + '\n' + pristineScriptTag + '\n</html>');
 
             // Self-check: verify the settings we just computed actually made
             // it into the exact string that's about to become the file, and
@@ -314,7 +352,7 @@ function initExportTool(global, viewer) {
             const url = URL.createObjectURL(blob);
             const anchor = document.createElement('a');
             anchor.href = url;
-            const base = (file.name || 'scene').replace(/\.[^.]*$/, '');
+            const base = (source.name || 'scene').replace(/\.[^.]*$/, '');
             anchor.download = base + '.standalone.html';
             document.body.appendChild(anchor);
             anchor.click();
